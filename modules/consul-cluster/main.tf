@@ -7,7 +7,7 @@ terraform {
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
-# CREATE AN AUTO SCALING GROUP (ASG) TO RUN VAULT
+# CREATE AN AUTO SCALING GROUP (ASG) TO RUN CONSUL
 # ---------------------------------------------------------------------------------------------------------------------
 
 resource "aws_autoscaling_group" "autoscaling_group" {
@@ -18,7 +18,7 @@ resource "aws_autoscaling_group" "autoscaling_group" {
   availability_zones  = ["${var.availability_zones}"]
   vpc_zone_identifier = ["${var.subnet_ids}"]
 
-  # Use a fixed-size cluster
+  # Run a fixed number of instances in the ASG
   min_size             = "${var.cluster_size}"
   max_size             = "${var.cluster_size}"
   desired_capacity     = "${var.cluster_size}"
@@ -28,12 +28,19 @@ resource "aws_autoscaling_group" "autoscaling_group" {
   health_check_grace_period = "${var.health_check_grace_period}"
   wait_for_capacity_timeout = "${var.wait_for_capacity_timeout}"
 
-  tags = ["${concat(
-    list(
-      map("key", var.cluster_tag_key, "value", var.cluster_name, "propagate_at_launch", true)
-    ),
-    var.cluster_extra_tags)
-  }"]
+  tags = [
+    {
+      key                 = "Name"
+      value               = "${var.cluster_name}"
+      propagate_at_launch = true
+    },
+    {
+      key                 = "${var.cluster_tag_key}"
+      value               = "${var.cluster_tag_value}"
+      propagate_at_launch = true
+    },
+    "${var.tags}",
+  ]
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -45,10 +52,11 @@ resource "aws_launch_configuration" "launch_configuration" {
   image_id      = "${var.ami_id}"
   instance_type = "${var.instance_type}"
   user_data     = "${var.user_data}"
+  spot_price    = "${var.spot_price}"
 
   iam_instance_profile        = "${aws_iam_instance_profile.instance_profile.name}"
   key_name                    = "${var.ssh_key_name}"
-  security_groups             = ["${concat(list(aws_security_group.lc_security_group.id), var.additional_security_group_ids)}"]
+  security_groups             = ["${aws_security_group.lc_security_group.id}"]
   placement_tenancy           = "${var.tenancy}"
   associate_public_ip_address = "${var.associate_public_ip_address}"
 
@@ -93,7 +101,7 @@ resource "aws_security_group" "lc_security_group" {
   }
 }
 
-resource "aws_security_group_rule" "allow_ssh_inbound_from_cidr_blocks" {
+resource "aws_security_group_rule" "allow_ssh_inbound" {
   count       = "${length(var.allowed_ssh_cidr_blocks) >= 1 ? 1 : 0}"
   type        = "ingress"
   from_port   = "${var.ssh_port}"
@@ -126,24 +134,27 @@ resource "aws_security_group_rule" "allow_all_outbound" {
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
-# THE INBOUND/OUTBOUND RULES FOR THE SECURITY GROUP COME FROM THE VAULT-SECURITY-GROUP-RULES MODULE
+# THE CONSUL-SPECIFIC INBOUND/OUTBOUND RULES COME FROM THE CONSUL-SECURITY-GROUP-RULES MODULE
 # ---------------------------------------------------------------------------------------------------------------------
 
 module "security_group_rules" {
-  source = "../vault-security-group-rules"
+  source = "../consul-security-group-rules"
 
-  security_group_id                    = "${aws_security_group.lc_security_group.id}"
-  allowed_inbound_cidr_blocks          = ["${var.allowed_inbound_cidr_blocks}"]
-  allowed_inbound_security_group_ids   = ["${var.allowed_inbound_security_group_ids}"]
-  allowed_inbound_security_group_count = "${var.allowed_inbound_security_group_count}"
+  security_group_id                  = "${aws_security_group.lc_security_group.id}"
+  allowed_inbound_cidr_blocks        = ["${var.allowed_inbound_cidr_blocks}"]
+  allowed_inbound_security_group_ids = ["${var.allowed_inbound_security_group_ids}"]
 
-  api_port     = "${var.api_port}"
-  cluster_port = "${var.cluster_port}"
+  server_rpc_port = "${var.server_rpc_port}"
+  cli_rpc_port    = "${var.cli_rpc_port}"
+  serf_lan_port   = "${var.serf_lan_port}"
+  serf_wan_port   = "${var.serf_wan_port}"
+  http_api_port   = "${var.http_api_port}"
+  dns_port        = "${var.dns_port}"
 }
 
 # ---------------------------------------------------------------------------------------------------------------------
 # ATTACH AN IAM ROLE TO EACH EC2 INSTANCE
-# We can use the IAM role to grant the instance IAM permissions so we can use the AWS APIs without having to figure out
+# We can use the IAM role to grant the instance IAM permissions so we can use the AWS CLI without having to figure out
 # how to get our secret AWS access keys onto the box.
 # ---------------------------------------------------------------------------------------------------------------------
 
@@ -184,32 +195,12 @@ data "aws_iam_policy_document" "instance_role" {
   }
 }
 
-resource "aws_s3_bucket" "vault_storage" {
-  count         = "${var.enable_s3_backend ? 1 : 0}"
-  bucket        = "${var.s3_bucket_name}"
-  force_destroy = "${var.force_destroy_s3_bucket}"
+# ---------------------------------------------------------------------------------------------------------------------
+# THE IAM POLICIES COME FROM THE CONSUL-IAM-POLICIES MODULE
+# ---------------------------------------------------------------------------------------------------------------------
 
-  tags {
-    Description = "Used for secret storage with Vault. DO NOT DELETE this Bucket unless you know what you are doing."
-  }
-}
+module "iam_policies" {
+  source = "../consul-iam-policies"
 
-resource "aws_iam_role_policy" "vault_s3" {
-  count  = "${var.enable_s3_backend ? 1 : 0}"
-  name   = "vault_s3"
-  role   = "${aws_iam_role.instance_role.id}"
-  policy = "${element(concat(data.aws_iam_policy_document.vault_s3.*.json, list("")), 0)}"
-}
-
-data "aws_iam_policy_document" "vault_s3" {
-  count  = "${var.enable_s3_backend ? 1 : 0}"
-  statement {
-    effect  = "Allow"
-    actions = ["s3:*"]
-
-    resources = [
-      "${aws_s3_bucket.vault_storage.arn}",
-      "${aws_s3_bucket.vault_storage.arn}/*",
-    ]
-  }
+  iam_role_id = "${aws_iam_role.instance_role.id}"
 }

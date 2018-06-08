@@ -15,8 +15,7 @@ terraform {
 module "vault_cluster" {
   # When using these modules in your own templates, you will need to use a Git URL with a ref attribute that pins you
   # to a specific version of the modules, such as the following example:
-  # source = "github.com/hashicorp/terraform-aws-consul.git/modules/vault-cluster?ref=v0.0.1"
-  source = "../../modules/vault-cluster"
+  source = "modules/vault-cluster"
 
   cluster_name  = "${var.vault_cluster_name}"
   cluster_size  = "${var.vault_cluster_size}"
@@ -45,7 +44,7 @@ module "vault_cluster" {
 # ---------------------------------------------------------------------------------------------------------------------
 
 module "consul_iam_policies_servers" {
-  source = "github.com/hashicorp/terraform-aws-consul.git//modules/consul-iam-policies?ref=v0.3.3"
+  source = "modules/consul-iam-policies"
 
   iam_role_id = "${module.vault_cluster.iam_role_id}"
 }
@@ -56,7 +55,7 @@ module "consul_iam_policies_servers" {
 # ---------------------------------------------------------------------------------------------------------------------
 
 data "template_file" "user_data_vault_cluster" {
-  template = "${file("${path.module}/user-data-vault.sh")}"
+  template = "${file("${path.module}/files/user-data-vault.sh")}"
 
   vars {
     aws_region               = "${data.aws_region.current.name}"
@@ -72,7 +71,7 @@ data "template_file" "user_data_vault_cluster" {
 # ---------------------------------------------------------------------------------------------------------------------
 
 module "security_group_rules" {
-  source = "github.com/hashicorp/terraform-aws-consul.git//modules/consul-client-security-group-rules?ref=v0.3.3"
+  source = "modules/consul-client-security-group-rules"
 
   security_group_id           = "${module.vault_cluster.security_group_id}"
 
@@ -87,7 +86,7 @@ module "security_group_rules" {
 # ---------------------------------------------------------------------------------------------------------------------
 
 module "consul_cluster" {
-  source = "github.com/hashicorp/terraform-aws-consul.git//modules/consul-cluster?ref=v0.3.3"
+  source = "modules/consul-cluster"
 
   cluster_name  = "${var.consul_cluster_name}"
   cluster_size  = "${var.consul_cluster_size}"
@@ -117,7 +116,7 @@ module "consul_cluster" {
 # ---------------------------------------------------------------------------------------------------------------------
 
 data "template_file" "user_data_consul" {
-  template = "${file("${path.module}/user-data-consul.sh")}"
+  template = "${file("${path.module}/files/user-data-consul.sh")}"
 
   vars {
     consul_cluster_tag_key   = "${var.consul_cluster_tag_key}"
