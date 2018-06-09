@@ -1,4 +1,5 @@
 .terraform
+terraform.*
 */tls/ca.crt.pem
 */tls/vault.crt.pem
 */tls/vault.key.pem
