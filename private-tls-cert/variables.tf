@@ -5,43 +5,42 @@
 
 variable "ca_public_key_file_path" {
   description = "Write the PEM-encoded CA certificate public key to this path (e.g. /etc/tls/ca.crt.pem)."
-  default = "ca.crt.pem"
+  default = "../packer/tls/ca.crt.pem"
 }
 
 variable "public_key_file_path" {
   description = "Write the PEM-encoded certificate public key to this path (e.g. /etc/tls/vault.crt.pem)."
-  default = "vault.crt.pem"
+  default = "../packer/tls/vault.crt.pem"
 }
 
 variable "private_key_file_path" {
   description = "Write the PEM-encoded certificate private key to this path (e.g. /etc/tls/vault.key.pem)."
-  default = "vault.key.pem"
+  default = "../packer/tls/vault.key.pem"
 }
 
 variable "owner" {
   description = "The OS user who should be given ownership over the certificate files."
-  default = "danny.nunez"
 }
 
 variable "organization_name" {
   description = "The name of the organization to associate with the certificates (e.g. Acme Co)."
-  default = "smarshd.com"
+  default = "example.com"
 }
 
 variable "ca_common_name" {
   description = "The common name to use in the subject of the CA certificate (e.g. acme.co cert)."
-  default = "smarshd.com"
+  default = "example.com"
 }
 
 variable "common_name" {
   description = "The common name to use in the subject of the certificate (e.g. acme.co cert)."
-  default = "smarshd.com"
+  default = "example.com"
 }
 
 variable "dns_names" {
   description = "List of DNS names for which the certificate will be valid (e.g. vault.service.consul, foo.example.com)."
   type        = "list"
-  default     = ["hshc.lde0.smarshd.com","hshd.lde0.smarshd.com","hshm.lde0.smarshd.com"]
+  default     = ["vault.example.com.consul.example.com"]
 }
 
 variable "ip_addresses" {
