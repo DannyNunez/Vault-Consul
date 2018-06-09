@@ -28,8 +28,8 @@
     },
     {
       "type": "file",
-      "source": "terraform-aws-vault",
-      "destination": "/tmp/terraform-aws-vault",
+      "source": "../modules/install-vault",
+      "destination": "/tmp/install-vault",
       "pause_before": "25s"
     },
     {
@@ -42,7 +42,7 @@
     },
     {
       "type": "shell",
-      "inline": [ "/tmp/terraform-aws-vault/modules/install-vault/install-vault --version 0.9.6"],
+      "inline": [ "/tmp/install-vault/install-vault --version 0.9.6"],
       "pause_before": "45s"
     },
     {
